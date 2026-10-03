@@ -1,0 +1,48 @@
+@model NotificationListViewModel
+@{
+    ViewData["Title"] = "Notifications";
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Notifications</h1>
+        <p class="page-subtitle">Booking, payment, check-in/check-out and maintenance alerts.</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <div class="seg">
+            <a asp-action="Index" class="@(!Model.UnreadOnly ? "active" : "")">All</a>
+            <a asp-action="Index" asp-route-unread="true" class="@(Model.UnreadOnly ? "active" : "")">Unread (@Model.UnreadCount)</a>
+        </div>
+        @if (Model.UnreadCount > 0)
+        {
+            <form asp-action="MarkAllRead" method="post"><button class="btn btn-light btn-sm"><i class="bi bi-check2-all me-1"></i>Mark all as read</button></form>
+        }
+    </div>
+</div>
+
+<div class="card-sh">
+    @foreach (var n in Model.Notifications.Items)
+    {
+        var style = Ui.Style(n.Type);
+        <div class="notif-item @(n.IsRead ? "" : "unread")">
+            <span class="notif-icon bg-soft-@style.Tone"><i class="bi @style.Icon"></i></span>
+            <div class="flex-fill min-w-0">
+                <div class="fw-semibold notif-title">@n.Title</div>
+                <div>@n.Message</div>
+                <div class="small text-muted">@n.Type.DisplayName() · @Ui.TimeAgo(n.CreatedAt)</div>
+            </div>
+            <div class="d-flex gap-1">
+                <form asp-action="Open" asp-route-id="@n.Id" method="post">
+                    <button class="btn-icon view" title="@(n.Link is null ? "Mark as read" : "Open")"><i class="bi @(n.Link is null ? "bi-check2" : "bi-box-arrow-up-right")"></i></button>
+                </form>
+                <form asp-action="Delete" asp-route-id="@n.Id" method="post">
+                    <button class="btn-icon delete" title="Delete"><i class="bi bi-x-lg"></i></button>
+                </form>
+            </div>
+        </div>
+    }
+    @if (Model.Notifications.TotalCount == 0)
+    {
+        <div class="empty-state"><i class="bi bi-bell-slash"></i>No notifications.</div>
+    }
+    <partial name="_Pager" model="Model.Notifications" />
+</div>

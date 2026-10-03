@@ -1,0 +1,59 @@
+@model InvoiceCreateViewModel
+@{
+    ViewData["Title"] = "New Invoice";
+}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index">Payments &amp; Billing</a> / New invoice</div>
+        <h1 class="page-title">New Invoice</h1>
+        <p class="page-subtitle">Invoice a booking in advance (e.g. to take a deposit). Invoices are also created automatically at check-in.</p>
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-8 col-xl-6">
+        <div class="card-sh">
+            <div class="card-body">
+                @if (Model.Bookings.Count == 0)
+                {
+                    <div class="empty-state"><i class="bi bi-check2-all"></i>Every active booking already has an invoice.</div>
+                }
+                else
+                {
+                    <form asp-action="Create" method="post">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+                        <div class="mb-3">
+                            <label asp-for="BookingId" class="form-label"></label>
+                            <select asp-for="BookingId" class="form-select">
+                                <option value="">Select booking…</option>
+                                @foreach (var b in Model.Bookings)
+                                {
+                                    <option value="@b.Id">@b.BookingNumber · @b.Guest?.FullName · Room @b.Room?.RoomNumber · @Ui.Date(b.CheckInDate) · @Ui.Money(b.TotalAmount)</option>
+                                }
+                            </select>
+                            <span asp-validation-for="BookingId" class="text-danger small"></span>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label asp-for="ExtraCharges" class="form-label"></label>
+                                <input asp-for="ExtraCharges" type="number" step="0.01" min="0" class="form-control" />
+                                <span asp-validation-for="ExtraCharges" class="text-danger small"></span>
+                            </div>
+                            <div class="col-6">
+                                <label asp-for="Discount" class="form-label"></label>
+                                <input asp-for="Discount" type="number" step="0.01" min="0" class="form-control" />
+                                <span asp-validation-for="Discount" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <textarea asp-for="Notes" rows="2" class="form-control"></textarea>
+                        </div>
+                        <button class="btn btn-primary"><i class="bi bi-receipt me-1"></i>Create invoice</button>
+                        <a asp-action="Index" class="btn btn-light">Cancel</a>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

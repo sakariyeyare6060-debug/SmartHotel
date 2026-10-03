@@ -1,0 +1,35 @@
+@model IPagedResult
+@{
+    string PageUrl(int p)
+    {
+        var query = Context.Request.Query.ToDictionary(k => k.Key, v => (string?)v.Value.ToString());
+        query["page"] = p.ToString();
+        return Context.Request.Path + QueryString.Create(query).ToUriComponent();
+    }
+
+    var start = Math.Max(1, Model.Page - 2);
+    var end = Math.Min(Model.TotalPages, start + 4);
+    start = Math.Max(1, end - 4);
+    var firstItem = Model.TotalCount == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    var lastItem = Math.Min(Model.TotalCount, Model.Page * Model.PageSize);
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 border-top">
+    <span class="text-muted small">Showing @firstItem–@lastItem of @Model.TotalCount</span>
+    @if (Model.TotalPages > 1)
+    {
+        <nav aria-label="Pagination">
+            <ul class="pagination pagination-sm mb-0 pager-sh">
+                <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page - 1)" aria-label="Previous"><i class="bi bi-chevron-left"></i></a>
+                </li>
+                @for (var p = start; p <= end; p++)
+                {
+                    <li class="page-item @(p == Model.Page ? "active" : "")"><a class="page-link" href="@PageUrl(p)">@p</a></li>
+                }
+                <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                    <a class="page-link" href="@PageUrl(Model.Page + 1)" aria-label="Next"><i class="bi bi-chevron-right"></i></a>
+                </li>
+            </ul>
+        </nav>
+    }
+</div>

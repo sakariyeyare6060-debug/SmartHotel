@@ -1,0 +1,162 @@
+@model InvoiceDetailsViewModel
+@{
+    var inv = Model.Invoice;
+    var b = inv.Booking!;
+    ViewData["Title"] = $"Invoice {inv.InvoiceNumber}";
+    var open = inv.Status != InvoiceStatus.Void;
+}
+<div class="page-header no-print">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index">Payments &amp; Billing</a> / @inv.InvoiceNumber</div>
+        <h1 class="page-title d-flex align-items-center gap-2">Invoice @inv.InvoiceNumber @Ui.Badge(inv.Status)</h1>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-controller="Bookings" asp-action="Details" asp-route-id="@b.Id" class="btn btn-light"><i class="bi bi-calendar-check me-1"></i>Booking @b.BookingNumber</a>
+        <button type="button" class="btn btn-light" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card-sh doc">
+            <div class="card-body p-4">
+                <div class="doc-head mb-4">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 fs-4 fw-bold text-primary"><i class="bi bi-buildings"></i>@Model.Hotel.Name</div>
+                        <div class="small text-muted">@Model.Hotel.Address<br />@Model.Hotel.Phone · @Model.Hotel.Email</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fs-5 fw-bold">INVOICE</div>
+                        <div class="small"># @inv.InvoiceNumber</div>
+                        <div class="small text-muted">Issued @Ui.Date(inv.IssuedAt) · Due @Ui.Date(inv.DueDate)</div>
+                    </div>
+                </div>
+                <div class="row mb-4">
+                    <div class="col-sm-6">
+                        <div class="small text-muted">Billed to</div>
+                        <div class="fw-semibold">@b.Guest?.FullName</div>
+                        <div class="small">@b.Guest?.Phone<br />@b.Guest?.Email</div>
+                    </div>
+                    <div class="col-sm-6 text-sm-end">
+                        <div class="small text-muted">Stay</div>
+                        <div class="fw-semibold">Room @b.Room?.RoomNumber · @b.Room?.RoomType?.Name</div>
+                        <div class="small">@Ui.Date(b.CheckInDate) → @Ui.Date(b.CheckOutDate) (@b.Nights nights)</div>
+                    </div>
+                </div>
+                <table class="table table-sh mb-3">
+                    <thead><tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                    <tr><td>Room charge — @b.Room?.RoomType?.Name</td><td class="text-end">@b.Nights</td><td class="text-end">@Ui.Money(b.PricePerNight)</td><td class="text-end">@Ui.Money(inv.Subtotal)</td></tr>
+                    @if (inv.ExtraCharges > 0)
+                    {
+                        <tr><td>Extra charges (minibar, laundry, services)</td><td class="text-end">1</td><td class="text-end">@Ui.Money(inv.ExtraCharges)</td><td class="text-end">@Ui.Money(inv.ExtraCharges)</td></tr>
+                    }
+                    </tbody>
+                </table>
+                <div class="ms-auto" style="max-width:320px">
+                    @if (inv.Discount > 0)
+                    {
+                        <div class="summary-row"><span>Discount</span><span>-@Ui.Money(inv.Discount)</span></div>
+                    }
+                    <div class="summary-row"><span>Tax (@((inv.TaxRate * 100).ToString("0.#"))%)</span><span>@Ui.Money(inv.TaxAmount)</span></div>
+                    <div class="summary-row total"><span>Total</span><span>@Ui.Money(inv.Total)</span></div>
+                    <div class="summary-row text-success"><span>Paid</span><span>@Ui.Money(inv.AmountPaid)</span></div>
+                    <div class="summary-row total"><span>Balance</span><span class="@(inv.Balance > 0 && open ? "text-danger" : "")">@Ui.Money(open ? inv.Balance : 0)</span></div>
+                </div>
+                @if (!string.IsNullOrEmpty(inv.Notes))
+                {
+                    <p class="small text-muted mt-3 mb-0"><strong>Notes:</strong> @inv.Notes</p>
+                }
+            </div>
+        </div>
+
+        <div class="card-sh mt-3 no-print">
+            <div class="card-head"><h2>Payments</h2></div>
+            <div class="table-responsive">
+                <table class="table table-sh">
+                    <thead><tr><th>Receipt</th><th>Date</th><th>Method</th><th>Reference</th><th>Received by</th><th class="text-end">Amount</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var p in inv.Payments.OrderBy(p => p.PaidAt))
+                    {
+                        <tr>
+                            <td class="fw-semibold">@p.ReceiptNumber</td>
+                            <td>@Ui.Stamp(p.PaidAt)</td>
+                            <td>@p.Method.DisplayName()</td>
+                            <td>@(p.Reference ?? "—")</td>
+                            <td>@p.ReceivedBy</td>
+                            <td class="text-end">@Ui.Money(p.Amount)</td>
+                            <td class="actions"><a asp-action="Receipt" asp-route-id="@p.Id" class="btn-icon view" title="Receipt"><i class="bi bi-printer"></i></a></td>
+                        </tr>
+                    }
+                    @if (inv.Payments.Count == 0)
+                    {
+                        <tr><td colspan="7" class="empty-state"><i class="bi bi-cash"></i>No payments recorded yet.</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4 no-print">
+        @if (open && inv.Balance > 0)
+        {
+            <div class="card-sh mb-3" id="payment">
+                <div class="card-head"><h2>Record Payment</h2></div>
+                <div class="card-body">
+                    <form asp-action="AddPayment" method="post">
+                        <input type="hidden" asp-for="Payment.InvoiceId" />
+                        <div class="mb-3">
+                            <label asp-for="Payment.Amount" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text">@Ui.Currency</span>
+                                <input asp-for="Payment.Amount" type="number" step="0.01" min="0.01" max="@inv.Balance.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="form-control" />
+                            </div>
+                            <span asp-validation-for="Payment.Amount" class="text-danger small"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Payment.Method" class="form-label"></label>
+                            <select asp-for="Payment.Method" asp-items="Html.GetEnumSelectList<PaymentMethod>()" class="form-select"></select>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Payment.Reference" class="form-label"></label>
+                            <input asp-for="Payment.Reference" class="form-control" placeholder="Card / EVC / transaction no." />
+                        </div>
+                        <button class="btn btn-success w-100"><i class="bi bi-cash-coin me-1"></i>Record payment</button>
+                    </form>
+                </div>
+            </div>
+        }
+        @if (open)
+        {
+            <div class="card-sh">
+                <div class="card-head"><h2>Adjust Invoice</h2></div>
+                <div class="card-body">
+                    <form asp-action="Adjust" method="post">
+                        <input type="hidden" asp-for="Adjust.Id" />
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label asp-for="Adjust.ExtraCharges" class="form-label"></label>
+                                <input asp-for="Adjust.ExtraCharges" type="number" step="0.01" min="0" class="form-control" />
+                            </div>
+                            <div class="col-6">
+                                <label asp-for="Adjust.Discount" class="form-label"></label>
+                                <input asp-for="Adjust.Discount" type="number" step="0.01" min="0" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Adjust.Notes" class="form-label"></label>
+                            <textarea asp-for="Adjust.Notes" rows="2" class="form-control"></textarea>
+                        </div>
+                        <button class="btn btn-light w-100"><i class="bi bi-calculator me-1"></i>Recalculate</button>
+                    </form>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-secondary">This invoice is void because the booking was cancelled.</div>
+        }
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

@@ -1,0 +1,85 @@
+@model StaffFormViewModel
+@{
+    ViewData["Title"] = Model.IsEdit ? $"Edit {Model.FullName}" : "Add Staff";
+    var roles = Enum.GetValues<UserRole>().Where(r => r != UserRole.Admin || User.IsAdmin());
+}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index">Staff</a> / @(Model.IsEdit ? "Edit" : "New")</div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+    </div>
+</div>
+<div class="row">
+    <div class="col-xl-8">
+        <div class="card-sh">
+            <div class="card-body">
+                <form asp-action="@(Model.IsEdit ? "Edit" : "Create")" asp-route-id="@Model.Id" method="post" autocomplete="off">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+                    <div class="form-section-title mt-0">Employee</div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="FullName" class="form-label"></label>
+                            <input asp-for="FullName" class="form-control" />
+                            <span asp-validation-for="FullName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Phone" class="form-label"></label>
+                            <input asp-for="Phone" class="form-control" />
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="HireDate" class="form-label"></label>
+                            <input asp-for="HireDate" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div class="form-section-title">Login account &amp; permissions</div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="Username" class="form-label"></label>
+                            <input asp-for="Username" class="form-control" autocomplete="off" />
+                            <span asp-validation-for="Username" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Role" class="form-label"></label>
+                            <select asp-for="Role" class="form-select">
+                                @foreach (var r in roles)
+                                {
+                                    <option value="@r">@r</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Role" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Password" class="form-label">@(Model.IsEdit ? "New password (optional)" : "Password")</label>
+                            <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="ConfirmPassword" class="form-label"></label>
+                            <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch">
+                                <input asp-for="IsActive" class="form-check-input" role="switch" />
+                                <label asp-for="IsActive" class="form-check-label"></label>
+                            </div>
+                            <div class="form-text">Inactive accounts cannot sign in; changing role or status signs the user out everywhere.</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button class="btn btn-primary"><i class="bi bi-check2 me-1"></i>@(Model.IsEdit ? "Save changes" : "Create account")</button>
+                        <a asp-action="Index" class="btn btn-light">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

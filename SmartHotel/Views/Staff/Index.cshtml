@@ -1,0 +1,79 @@
+@model StaffListViewModel
+@{
+    ViewData["Title"] = "Staff Management";
+    var me = User.GetUserId();
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Staff Management</h1>
+        <p class="page-subtitle">Employees, roles, permissions and login accounts.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Add Staff</a>
+</div>
+
+<div class="card-sh">
+    <form method="get" class="card-filter row g-2">
+        <div class="col-md-6 col-lg-5">
+            <div class="input-icon"><i class="bi bi-search"></i>
+                <input name="search" value="@Model.Search" class="form-control" placeholder="Search staff..." />
+            </div>
+        </div>
+        <div class="col-8 col-md-3">
+            <select name="role" class="form-select" onchange="this.form.submit()">
+                <option value="">All roles</option>
+                @foreach (var r in Enum.GetValues<UserRole>())
+                {
+                    <option value="@r" selected="@(Model.Role == r)">@r</option>
+                }
+            </select>
+        </div>
+        <div class="col-4 col-md-auto"><button class="btn btn-light w-100">Search</button></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table table-sh">
+            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Email</th><th>Phone</th><th>Last login</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <tbody>
+            @foreach (var s in Model.Staff.Items)
+            {
+                <tr>
+                    <td><div class="d-flex align-items-center gap-2"><span class="avatar avatar-sm">@Ui.Initials(s.FullName)</span><span class="fw-semibold">@s.FullName</span>@if (s.Id == me) { <span class="pill pill-secondary">You</span> }</div></td>
+                    <td>@s.Username</td>
+                    <td>@s.Role</td>
+                    <td>@s.Email</td>
+                    <td>@s.Phone</td>
+                    <td class="small">@(s.LastLoginAt is null ? "Never" : Ui.TimeAgo(s.LastLoginAt.Value))</td>
+                    <td>@Ui.ActiveBadge(s.IsActive) @if (s.LockoutEnd > DateTime.Now) { <span class="pill pill-danger">Locked</span> }</td>
+                    <td class="actions">
+                        <a asp-action="Edit" asp-route-id="@s.Id" class="btn-icon edit" title="Edit"><i class="bi bi-pencil-square"></i></a>
+                        <a asp-action="ResetPassword" asp-route-id="@s.Id" class="btn-icon view" title="Reset password"><i class="bi bi-key"></i></a>
+                        @if (s.Id != me)
+                        {
+                            <form asp-action="Delete" asp-route-id="@s.Id" method="post" data-confirm="Delete the account of @s.FullName? They will no longer be able to sign in." data-confirm-title="Delete staff account">
+                                <button class="btn-icon delete" title="Delete"><i class="bi bi-trash3"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Staff.TotalCount == 0)
+            {
+                <tr><td colspan="8" class="empty-state"><i class="bi bi-person-badge"></i>No staff found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Staff" />
+</div>
+
+<div class="card-sh mt-3">
+    <div class="card-head"><h2>Role Based Access</h2><span class="small text-muted fw-normal">Different roles, different access</span></div>
+    <div class="card-body">
+        <div class="row g-3 row-cols-1 row-cols-sm-2 row-cols-xl-5">
+            <div class="col"><div class="p-3 rounded-3 bg-soft-primary h-100"><i class="bi bi-award fs-3"></i><div class="fw-bold mt-1">Admin</div><div class="small">Full access to all modules</div></div></div>
+            <div class="col"><div class="p-3 rounded-3 bg-soft-green h-100"><i class="bi bi-person-gear fs-3"></i><div class="fw-bold mt-1">Manager</div><div class="small">Bookings, rooms, staff and reports</div></div></div>
+            <div class="col"><div class="p-3 rounded-3 bg-soft-purple h-100"><i class="bi bi-headset fs-3"></i><div class="fw-bold mt-1">Receptionist</div><div class="small">Bookings, guests, check-in/out, billing</div></div></div>
+            <div class="col"><div class="p-3 rounded-3 bg-soft-orange h-100"><i class="bi bi-stars fs-3"></i><div class="fw-bold mt-1">Housekeeping</div><div class="small">Manage room status</div></div></div>
+            <div class="col"><div class="p-3 rounded-3 bg-soft-red h-100"><i class="bi bi-tools fs-3"></i><div class="fw-bold mt-1">Maintenance</div><div class="small">Repairs, fault types &amp; costs</div></div></div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,82 @@
+@model InvoiceListViewModel
+@{
+    ViewData["Title"] = "Payment & Billing";
+    var viewLabel = Model.View switch
+    {
+        InvoiceView.Collected => "Invoices with payments collected",
+        InvoiceView.Outstanding => "Invoices with an outstanding balance",
+        InvoiceView.PaidToday => "Invoices paid today",
+        _ => null
+    };
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Payment &amp; Billing</h1>
+        <p class="page-subtitle">Invoices, payments, taxes, discounts, balances and receipts.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Invoice</a>
+</div>
+
+<div class="row g-3 mb-3 row-cols-1 row-cols-sm-2 row-cols-xl-4">
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Total invoiced", Ui.Money(Model.Summary.TotalInvoiced, true), "bi-receipt", "primary", Url: Url.Action("Index")))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Collected", Ui.Money(Model.Summary.TotalCollected, true), "bi-cash-stack", "green", Url: Url.Action("Index", new { view = InvoiceView.Collected })))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Outstanding", Ui.Money(Model.Summary.Outstanding, true), "bi-hourglass-split", "red", Url: Url.Action("Index", new { view = InvoiceView.Outstanding })))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Collected today", Ui.Money(Model.Summary.CollectedToday, true), "bi-calendar-day", "orange", Url: Url.Action("Index", new { view = InvoiceView.PaidToday })))</div>
+</div>
+
+<div class="card-sh">
+    <form method="get" class="card-filter row g-2">
+        @if (Model.View.HasValue) { <input type="hidden" name="view" value="@Model.View" /> }
+        <div class="col-md-6 col-lg-5">
+            <div class="input-icon"><i class="bi bi-search"></i>
+                <input name="search" value="@Model.Search" class="form-control" placeholder="Search by guest, room or invoice #..." />
+            </div>
+        </div>
+        <div class="col-8 col-md-3">
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="">All Status</option>
+                @foreach (var s in Enum.GetValues<InvoiceStatus>())
+                {
+                    <option value="@s" selected="@(Model.Status == s)">@s.DisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-4 col-md-auto"><button class="btn btn-light w-100">Search</button></div>
+    </form>
+    @if (viewLabel is not null)
+    {
+        <div class="px-3 pb-2"><span class="pill pill-info">@viewLabel <a asp-action="Index" asp-route-search="@Model.Search" asp-route-status="@Model.Status" class="ms-1" aria-label="Clear filter"><i class="bi bi-x-lg"></i></a></span></div>
+    }
+    <div class="table-responsive">
+        <table class="table table-sh">
+            <thead><tr><th>Invoice #</th><th>Guest</th><th>Room</th><th>Issued</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <tbody>
+            @foreach (var i in Model.Invoices.Items)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@i.Id" class="fw-semibold">@i.InvoiceNumber</a></td>
+                    <td>@i.Booking?.Guest?.FullName</td>
+                    <td>@i.Booking?.Room?.RoomNumber</td>
+                    <td>@Ui.Date(i.IssuedAt)</td>
+                    <td>@Ui.Money(i.Total)</td>
+                    <td>@Ui.Money(i.AmountPaid)</td>
+                    <td class="@(i.Balance > 0 && i.Status != InvoiceStatus.Void ? "text-danger fw-semibold" : "")">@Ui.Money(i.Status == InvoiceStatus.Void ? 0 : i.Balance)</td>
+                    <td>@Ui.Badge(i.Status)</td>
+                    <td class="actions">
+                        <a asp-action="Details" asp-route-id="@i.Id" class="btn-icon view" title="View invoice"><i class="bi bi-eye"></i></a>
+                        @if (i.Balance > 0 && i.Status != InvoiceStatus.Void)
+                        {
+                            <a asp-action="Details" asp-route-id="@i.Id" asp-fragment="payment" class="btn-icon success" title="Record payment"><i class="bi bi-cash-coin"></i></a>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Invoices.TotalCount == 0)
+            {
+                <tr><td colspan="9" class="empty-state"><i class="bi bi-receipt"></i>No invoices found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Invoices" />
+</div>

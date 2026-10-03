@@ -1,0 +1,147 @@
+@model MaintenanceViewModel
+@{
+    ViewData["Title"] = "Maintenance";
+    // Reopen the form after a failed submit so nothing typed is lost.
+    var reopen = Model.Form.RoomId != 0 && !ViewData.ModelState.IsValid;
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Maintenance</h1>
+        <p class="page-subtitle">Rooms out of service. Open a room, record the fault, what you fixed and the cost, then submit it as repaired.</p>
+    </div>
+</div>
+
+<div class="row g-3 mb-3 row-cols-1 row-cols-sm-3">
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Rooms awaiting repair", Model.Rooms.Count.ToString(), "bi-tools", "red"))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Repairs this month", Model.RepairsThisMonth.ToString(), "bi-check2-circle", "green"))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Repair cost this month", Ui.Money(Model.CostThisMonth), "bi-currency-dollar", "orange"))</div>
+</div>
+
+<div class="card-sh mb-3">
+    <div class="card-head"><h2>Rooms under maintenance</h2></div>
+    <div class="card-body">
+        <div class="room-grid">
+            @foreach (var m in Model.Rooms)
+            {
+                <button type="button" class="room-tile tone-danger text-start" data-bs-toggle="modal" data-bs-target="#repairModal"
+                        data-room-id="@m.Room.Id" data-room-number="@m.Room.RoomNumber" data-issue="@m.ReportedIssue">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="room-no">@m.Room.RoomNumber</span>
+                        <i class="bi bi-tools text-muted"></i>
+                    </div>
+                    <div class="room-type mb-2">@m.Room.RoomType?.Name · Floor @m.Room.Floor</div>
+                    <div class="small mb-1">@(string.IsNullOrEmpty(m.ReportedIssue) ? "No issue noted" : m.ReportedIssue)</div>
+                    @if (m.ReportedAt.HasValue)
+                    {
+                        <div class="small text-muted mb-2">@m.ReportedBy · @Ui.TimeAgo(m.ReportedAt.Value)</div>
+                    }
+                    <span class="pill pill-danger"><i class="bi bi-wrench me-1"></i>Report repair</span>
+                </button>
+            }
+        </div>
+        @if (Model.Rooms.Count == 0)
+        {
+            <div class="empty-state"><i class="bi bi-emoji-smile"></i>No rooms need repair right now.</div>
+        }
+    </div>
+</div>
+
+<div class="card-sh">
+    <div class="card-head"><h2>Recent repairs</h2></div>
+    <div class="table-responsive">
+        <table class="table table-sh">
+            <thead><tr><th>Date</th><th>Room</th><th>Fault type</th><th>Fault</th><th>Work done</th><th class="text-end">Cost</th><th>Repaired by</th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.RecentRepairs)
+            {
+                <tr>
+                    <td class="text-nowrap">@Ui.Stamp(r.CreatedAt)</td>
+                    <td class="fw-semibold">@r.Room?.RoomNumber</td>
+                    <td>@r.FaultType.DisplayName()</td>
+                    <td>@r.FaultDescription</td>
+                    <td>@(r.WorkDone ?? "—")</td>
+                    <td class="text-end">@Ui.Money(r.Cost)</td>
+                    <td>@r.ResolvedBy</td>
+                </tr>
+            }
+            @if (Model.RecentRepairs.Count == 0)
+            {
+                <tr><td colspan="7" class="empty-state"><i class="bi bi-clipboard-check"></i>No repairs recorded yet.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="repairModal" tabindex="-1" aria-hidden="true" data-reopen="@(reopen ? "true" : "false")">
+    <div class="modal-dialog modal-dialog-centered">
+        <form asp-action="Resolve" method="post" class="modal-content border-0 shadow">
+            <input type="hidden" asp-for="Form.RoomId" />
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Repair · Room <span data-room-label></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <p class="text-muted small mb-3" data-issue-row>Reported issue: <strong data-issue></strong></p>
+                <div class="mb-3">
+                    <label asp-for="Form.FaultType" class="form-label"></label>
+                    <select asp-for="Form.FaultType" asp-items="Html.GetEnumSelectList<MaintenanceFaultType>()" class="form-select" required>
+                        <option value="">Choose…</option>
+                    </select>
+                    <span asp-validation-for="Form.FaultType" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Form.FaultDescription" class="form-label"></label>
+                    <textarea asp-for="Form.FaultDescription" rows="2" class="form-control" maxlength="500" required placeholder="e.g. Compressor not cooling, leaking pipe under sink"></textarea>
+                    <span asp-validation-for="Form.FaultDescription" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Form.WorkDone" class="form-label">Work done (optional)</label>
+                    <textarea asp-for="Form.WorkDone" rows="2" class="form-control" maxlength="500" placeholder="e.g. Replaced capacitor and recharged gas"></textarea>
+                </div>
+                <div>
+                    <label asp-for="Form.Cost" class="form-label"></label>
+                    <div class="input-group">
+                        <span class="input-group-text">@Ui.Currency</span>
+                        <input asp-for="Form.Cost" type="number" min="0" step="0.01" class="form-control" required />
+                    </div>
+                    <span asp-validation-for="Form.Cost" class="text-danger small"></span>
+                </div>
+                <p class="small text-muted mt-3 mb-0"><i class="bi bi-info-circle me-1"></i>Submitting marks the room as repaired and sends it to housekeeping for cleaning.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i>Submit as repaired</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const modal = document.getElementById('repairModal');
+            const roomId = modal.querySelector('[name="Form.RoomId"]');
+
+            function showRoom(tile) {
+                modal.querySelector('[data-room-label]').textContent = tile.dataset.roomNumber;
+                modal.querySelector('[data-issue]').textContent = tile.dataset.issue || '';
+                modal.querySelector('[data-issue-row]').hidden = !tile.dataset.issue;
+            }
+
+            modal.addEventListener('show.bs.modal', e => {
+                const tile = e.relatedTarget;
+                if (!tile) return; // reopened after a failed submit
+                if (roomId.value !== tile.dataset.roomId) modal.querySelector('form').reset();
+                roomId.value = tile.dataset.roomId;
+                showRoom(tile);
+            });
+
+            if (modal.dataset.reopen === 'true') {
+                const tile = document.querySelector('.room-tile[data-room-id="' + roomId.value + '"]');
+                if (tile) showRoom(tile);
+                bootstrap.Modal.getOrCreateInstance(modal).show();
+            }
+        })();
+    </script>
+}

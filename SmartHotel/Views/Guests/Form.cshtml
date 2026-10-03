@@ -1,0 +1,82 @@
+@model GuestFormViewModel
+@{
+    ViewData["Title"] = Model.IsEdit ? "Edit Guest" : "Add Guest";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index">Guests</a> / @(Model.IsEdit ? "Edit" : "New")</div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-8">
+        <div class="card-sh">
+            <div class="card-body">
+                <form asp-action="@(Model.IsEdit ? "Edit" : "Create")" asp-route-id="@Model.Id" asp-route-returnUrl="@returnUrl" method="post">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+
+                    <div class="form-section-title mt-0">Personal information</div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="FirstName" class="form-label"></label>
+                            <input asp-for="FirstName" class="form-control" />
+                            <span asp-validation-for="FirstName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="LastName" class="form-label"></label>
+                            <input asp-for="LastName" class="form-control" />
+                            <span asp-validation-for="LastName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Phone" class="form-label"></label>
+                            <input asp-for="Phone" class="form-control" placeholder="0612345678" />
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" placeholder="name@example.com" />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="DateOfBirth" class="form-label"></label>
+                            <input asp-for="DateOfBirth" class="form-control" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Nationality" class="form-label"></label>
+                            <input asp-for="Nationality" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div class="form-section-title">Identification</div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="IdType" class="form-label"></label>
+                            <select asp-for="IdType" class="form-select" asp-items="@(new SelectList(GuestFormViewModel.IdTypes))"></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="IdNumber" class="form-label"></label>
+                            <input asp-for="IdNumber" class="form-control" />
+                            <span asp-validation-for="IdNumber" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Address" class="form-label"></label>
+                            <input asp-for="Address" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Notes" class="form-label"></label>
+                            <textarea asp-for="Notes" class="form-control" rows="2" placeholder="Preferences, allergies, VIP…"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button class="btn btn-primary"><i class="bi bi-check2 me-1"></i>@(Model.IsEdit ? "Save changes" : "Register guest")</button>
+                        <a href="@(Url.IsLocalUrl(returnUrl) ? returnUrl : Url.Action("Index"))" class="btn btn-light">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

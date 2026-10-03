@@ -1,0 +1,158 @@
+@model ReportViewModel
+@{
+    ViewData["Title"] = "Reports";
+    var f = Model.Filter;
+    var exportRoute = new Dictionary<string, string?>
+    {
+        ["mode"] = f.Mode.ToString(),
+        ["date"] = f.Date?.ToString("yyyy-MM-dd"),
+        ["month"] = f.Month,
+        ["from"] = f.From?.ToString("yyyy-MM-dd"),
+        ["to"] = f.To?.ToString("yyyy-MM-dd")
+    };
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">@Model.PeriodLabel</p>
+    </div>
+    <div class="seg">
+        @foreach (var mode in Enum.GetValues<ReportMode>())
+        {
+            <a asp-action="Index" asp-all-route-data="@(new Dictionary<string, string> { ["mode"] = mode.ToString() })" class="@(f.Mode == mode ? "active" : "")">@mode</a>
+        }
+    </div>
+</div>
+
+<div class="card-sh mb-3">
+    <form method="get" class="card-body row g-2 align-items-end">
+        <input type="hidden" name="mode" value="@f.Mode" />
+        @if (f.Mode == ReportMode.Daily)
+        {
+            <div class="col-sm-4 col-lg-3">
+                <label class="form-label" for="date">Date</label>
+                <input id="date" type="date" name="date" value="@f.Date?.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+        }
+        else if (f.Mode == ReportMode.Monthly)
+        {
+            <div class="col-sm-4 col-lg-3">
+                <label class="form-label" for="month">Month</label>
+                <input id="month" type="month" name="month" value="@f.Month" class="form-control" />
+            </div>
+        }
+        else
+        {
+            <div class="col-sm-4 col-lg-3">
+                <label class="form-label" for="from">From</label>
+                <input id="from" type="date" name="from" value="@f.From?.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-sm-4 col-lg-3">
+                <label class="form-label" for="to">To</label>
+                <input id="to" type="date" name="to" value="@f.To?.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+        }
+        <div class="col-auto"><button class="btn btn-primary"><i class="bi bi-arrow-repeat me-1"></i>Generate</button></div>
+        <div class="col-auto ms-auto">
+            <div class="dropdown">
+                <button type="button" class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-download me-1"></i>Export CSV</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" asp-action="Export" asp-all-route-data="@(new Dictionary<string, string>(exportRoute.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value!)) { ["kind"] = "bookings" })">Bookings report</a></li>
+                    <li><a class="dropdown-item" asp-action="Export" asp-all-route-data="@(new Dictionary<string, string>(exportRoute.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value!)) { ["kind"] = "payments" })">Payments report</a></li>
+                    <li><a class="dropdown-item" asp-action="Export" asp-all-route-data="@(new Dictionary<string, string>(exportRoute.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value!)) { ["kind"] = "guests" })">Guest report</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-auto"><button type="button" class="btn btn-light" onclick="window.print()" title="Print"><i class="bi bi-printer"></i></button></div>
+    </form>
+</div>
+
+<div class="row g-3 mb-3 row-cols-1 row-cols-sm-2 row-cols-xl-4">
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Total Bookings", Model.TotalBookings.ToString(), "bi-calendar-check", "primary", $"{Model.CancelledBookings} cancelled"))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Total Revenue", Ui.Money(Model.TotalRevenue), "bi-currency-dollar", "green", "Payments received"))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Occupancy Rate", $"{Model.OccupancyRate:0.#}%", "bi-pie-chart", "purple", $"{Model.RoomNightsSold} room-nights sold"))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Avg. Daily Rate", Ui.Money(Model.AverageDailyRate), "bi-graph-up-arrow", "orange", $"Room revenue {Ui.Money(Model.RoomRevenue, true)}"))</div>
+</div>
+<div class="row g-3 mb-3 row-cols-1 row-cols-sm-3">
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Check-ins", Model.CheckIns.ToString(), "bi-box-arrow-in-right", "sky"))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Check-outs", Model.CheckOuts.ToString(), "bi-box-arrow-right", "teal"))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("New Guests", Model.NewGuests.ToString(), "bi-person-plus", "red"))</div>
+</div>
+
+<div class="card-sh mb-3">
+    <div class="card-head"><h2>@Model.SeriesTitle</h2></div>
+    <div class="card-body"><div class="chart-box"><canvas id="seriesChart" aria-label="Revenue chart"></canvas></div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Payments by Method</h2></div>
+            <table class="table table-sh">
+                <thead><tr><th>Method</th><th class="text-end">Count</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.PaymentsByMethod) { <tr><td>@r.Name</td><td class="text-end">@r.Count</td><td class="text-end">@Ui.Money(r.Amount)</td></tr> }
+                @if (Model.PaymentsByMethod.Count == 0) { <tr><td colspan="3" class="empty-state">No payments in this period.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Bookings by Status</h2><span class="small text-muted fw-normal">Arrivals in period</span></div>
+            <table class="table table-sh">
+                <thead><tr><th>Status</th><th class="text-end">Bookings</th><th class="text-end">Value</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.BookingsByStatus) { <tr><td>@r.Name</td><td class="text-end">@r.Count</td><td class="text-end">@Ui.Money(r.Amount)</td></tr> }
+                @if (Model.BookingsByStatus.Count == 0) { <tr><td colspan="3" class="empty-state">No bookings in this period.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Occupancy by Room Type</h2></div>
+            <table class="table table-sh">
+                <thead><tr><th>Room type</th><th class="text-end">Room-nights</th><th class="text-end">Room revenue</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.RoomTypePerformance) { <tr><td>@r.Name</td><td class="text-end">@r.Count</td><td class="text-end">@Ui.Money(r.Amount)</td></tr> }
+                @if (Model.RoomTypePerformance.Count == 0) { <tr><td colspan="3" class="empty-state">No stays in this period.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Top Guests</h2><span class="small text-muted fw-normal">By payments</span></div>
+            <table class="table table-sh">
+                <thead><tr><th>Guest</th><th class="text-end">Payments</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.TopGuests) { <tr><td>@r.Name</td><td class="text-end">@r.Count</td><td class="text-end">@Ui.Money(r.Amount)</td></tr> }
+                @if (Model.TopGuests.Count == 0) { <tr><td colspan="3" class="empty-state">No guest payments in this period.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+        document.fonts.ready.then(() => {
+        Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+        new Chart(document.getElementById('seriesChart'), {
+            type: 'bar',
+            data: {
+                labels: @Json.Serialize(Model.SeriesLabels),
+                datasets: [{ label: 'Revenue', data: @Json.Serialize(Model.SeriesValues), backgroundColor: '#1d6ff2', borderRadius: 6, maxBarThickness: 34 }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                layout: { padding: { left: 6 } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => smartHotel.money(c.parsed.y) } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + Number(v).toLocaleString() } }, x: { grid: { display: false } } }
+            }
+        });
+        });
+    </script>
+}

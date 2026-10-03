@@ -1,0 +1,79 @@
+@model BookingListViewModel
+@{
+    ViewData["Title"] = "Booking Management";
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Booking Management</h1>
+        <p class="page-subtitle">Create, update, cancel and search reservations.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>New Booking</a>
+</div>
+
+<div class="card-sh">
+    <form method="get" class="card-filter row g-2 align-items-center">
+        <div class="col-lg-4">
+            <div class="input-icon"><i class="bi bi-search"></i>
+                <input name="search" value="@Model.Search" class="form-control" placeholder="Search by name, room or booking ID..." />
+            </div>
+        </div>
+        <div class="col-6 col-lg-2">
+            <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" class="form-control" title="Check-in from" aria-label="From" />
+        </div>
+        <div class="col-6 col-lg-2">
+            <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" class="form-control" title="Check-in to" aria-label="To" />
+        </div>
+        <div class="col-8 col-lg-2">
+            <select name="status" class="form-select">
+                <option value="">All Status</option>
+                @foreach (var s in Enum.GetValues<BookingStatus>())
+                {
+                    <option value="@s" selected="@(Model.Status == s)">@s.DisplayName()</option>
+                }
+            </select>
+        </div>
+        <div class="col-4 col-lg-2 d-flex gap-1">
+            <button class="btn btn-primary flex-fill">Search</button>
+            <a asp-action="Index" class="btn btn-light" title="Reset"><i class="bi bi-x-lg"></i></a>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-sh">
+            <thead><tr><th>ID</th><th>Guest Name</th><th>Room</th><th>Check-in</th><th>Check-out</th><th>Nights</th><th>Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <tbody>
+            @foreach (var b in Model.Bookings.Items)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@b.Id" class="fw-semibold">@b.BookingNumber</a></td>
+                    <td>@b.Guest?.FullName</td>
+                    <td>@b.Room?.RoomNumber <span class="small text-muted">@b.Room?.RoomType?.Name</span></td>
+                    <td>@Ui.Date(b.CheckInDate)</td>
+                    <td>@Ui.Date(b.CheckOutDate)</td>
+                    <td>@b.Nights</td>
+                    <td>@Ui.Money(b.TotalAmount)</td>
+                    <td>@Ui.Badge(b.Status)</td>
+                    <td class="actions">
+                        <a asp-action="Details" asp-route-id="@b.Id" class="btn-icon view" title="View"><i class="bi bi-eye"></i></a>
+                        @if (b.Status is BookingStatus.Pending or BookingStatus.Confirmed or BookingStatus.CheckedIn)
+                        {
+                            <a asp-action="Edit" asp-route-id="@b.Id" class="btn-icon edit" title="Edit"><i class="bi bi-pencil-square"></i></a>
+                        }
+                        @if (b.Status is BookingStatus.Pending or BookingStatus.Confirmed)
+                        {
+                            <form asp-action="Cancel" asp-route-id="@b.Id" method="post" data-confirm="Cancel booking @b.BookingNumber for @b.Guest?.FullName?" data-confirm-title="Cancel booking" data-confirm-button="Cancel booking">
+                                <button class="btn-icon delete" title="Cancel"><i class="bi bi-x-circle"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Bookings.TotalCount == 0)
+            {
+                <tr><td colspan="9" class="empty-state"><i class="bi bi-calendar-x"></i>No bookings match your search.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Bookings" />
+</div>

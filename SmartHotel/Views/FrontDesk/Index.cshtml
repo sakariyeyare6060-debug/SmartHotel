@@ -1,0 +1,147 @@
+@model FrontDeskViewModel
+@{
+    ViewData["Title"] = "Check-in / Check-out";
+    var today = DateTime.Today;
+    var isCheckIn = Model.Tab == "checkin";
+    var returnHere = Url.Action("Index", "FrontDesk");
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Check-in / Check-out</h1>
+        <p class="page-subtitle">Arrivals and departures for @today.ToString("dddd, dd MMMM yyyy"). Room statuses update automatically.</p>
+    </div>
+    <div class="seg">
+        <a asp-action="Index" asp-route-tab="checkin" class="@(isCheckIn ? "active" : "")">Check-in <span class="opacity-75">(@Model.Arrivals.Count)</span></a>
+        <a asp-action="Index" asp-route-tab="checkout" class="@(!isCheckIn ? "active" : "")">Check-out <span class="opacity-75">(@Model.InHouse.Count)</span></a>
+    </div>
+</div>
+
+@if (isCheckIn)
+{
+    <div class="row g-3">
+        <div class="col-xl-5">
+            <div class="card-sh">
+                <div class="card-head"><h2>Walk-in Check-in</h2><span class="small text-muted fw-normal">Guest without a reservation</span></div>
+                <div class="card-body">
+                    <form asp-action="WalkIn" method="post">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <label asp-for="WalkIn.GuestId" class="form-label">Guest</label>
+                                <a asp-controller="Guests" asp-action="Create" asp-route-returnUrl="@returnHere" class="small"><i class="bi bi-person-plus"></i> New guest</a>
+                            </div>
+                            <select asp-for="WalkIn.GuestId" asp-items="Model.Guests" class="form-select">
+                                <option value="">Search guest…</option>
+                            </select>
+                            <span asp-validation-for="WalkIn.GuestId" class="text-danger small"></span>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label" for="walkInCheckIn">Check-in date</label>
+                                <input id="walkInCheckIn" type="date" class="form-control" value="@today.ToString("yyyy-MM-dd")" data-checkin readonly />
+                            </div>
+                            <div class="col-6">
+                                <label asp-for="WalkIn.CheckOutDate" class="form-label">Check-out date</label>
+                                <input asp-for="WalkIn.CheckOutDate" class="form-control" data-checkout min="@today.AddDays(1).ToString("yyyy-MM-dd")" />
+                                <span asp-validation-for="WalkIn.CheckOutDate" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="WalkIn.RoomId" class="form-label">Room</label>
+                            <select asp-for="WalkIn.RoomId" class="form-select" data-room-select>
+                                <option value="">Select room…</option>
+                                @foreach (var r in Model.ReadyRooms)
+                                {
+                                    <option value="@r.Id" data-price="@r.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)">@r.Label</option>
+                                }
+                            </select>
+                            <div class="form-text" data-room-count>@Model.ReadyRooms.Count ready room(s)</div>
+                            <span asp-validation-for="WalkIn.RoomId" class="text-danger small"></span>
+                        </div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-6">
+                                <label asp-for="WalkIn.Adults" class="form-label">Adults</label>
+                                <input asp-for="WalkIn.Adults" type="number" min="1" max="10" class="form-control" />
+                            </div>
+                            <div class="col-6">
+                                <label asp-for="WalkIn.Children" class="form-label">Children</label>
+                                <input asp-for="WalkIn.Children" type="number" min="0" max="10" class="form-control" />
+                            </div>
+                        </div>
+                        <button class="btn btn-primary w-100 py-2"><i class="bi bi-box-arrow-in-right me-1"></i>Process Check-in</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-7">
+            <div class="card-sh">
+                <div class="card-head"><h2>Today's Arrivals</h2><span class="small text-muted fw-normal">Reservations due in</span></div>
+                <div class="table-responsive">
+                    <table class="table table-sh">
+                        <thead><tr><th>Guest</th><th>Booking</th><th>Room</th><th>Stay</th><th>Status</th><th class="text-end"></th></tr></thead>
+                        <tbody>
+                        @foreach (var b in Model.Arrivals)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@b.Guest?.FullName @if (b.CheckInDate < today) { <span class="pill pill-danger ms-1">Late</span> }</td>
+                                <td><a asp-controller="Bookings" asp-action="Details" asp-route-id="@b.Id">@b.BookingNumber</a></td>
+                                <td>@b.Room?.RoomNumber @Ui.Badge(b.Room!.Status)</td>
+                                <td class="small">@b.CheckInDate.ToString("dd MMM") → @b.CheckOutDate.ToString("dd MMM") (@b.Nights n)</td>
+                                <td>@Ui.Badge(b.Status)</td>
+                                <td class="actions">
+                                    <form asp-action="CheckIn" asp-route-id="@b.Id" method="post">
+                                        <button class="btn btn-sm btn-success" disabled="@(!b.Room.IsReady)" title="@(b.Room.IsReady ? "Check in" : "Room not ready")">
+                                            <i class="bi bi-box-arrow-in-right me-1"></i>Check-in
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Arrivals.Count == 0)
+                        {
+                            <tr><td colspan="6" class="empty-state"><i class="bi bi-calendar-check"></i>No more arrivals expected today.</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card-sh">
+        <div class="card-head">
+            <h2>In-house Guests</h2>
+            <span class="small fw-normal"><span class="pill pill-warning">@Model.DeparturesToday due today</span></span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sh">
+                <thead><tr><th>Guest</th><th>Room</th><th>Booking</th><th>Checked in</th><th>Check-out</th><th>Balance</th><th class="text-end"></th></tr></thead>
+                <tbody>
+                @foreach (var b in Model.InHouse)
+                {
+                    var due = b.CheckOutDate.Date <= today;
+                    <tr>
+                        <td class="fw-semibold">@b.Guest?.FullName</td>
+                        <td>@b.Room?.RoomNumber <span class="small text-muted">@b.Room?.RoomType?.Name</span></td>
+                        <td><a asp-controller="Bookings" asp-action="Details" asp-route-id="@b.Id">@b.BookingNumber</a></td>
+                        <td class="small">@Ui.Stamp(b.ActualCheckIn)</td>
+                        <td>@Ui.Date(b.CheckOutDate) @if (due) { <span class="pill pill-warning ms-1">Due</span> }</td>
+                        <td class="@(b.Invoice?.Balance > 0 ? "text-danger fw-semibold" : "text-success")">@Ui.Money(b.Invoice?.Balance ?? b.TotalAmount)</td>
+                        <td class="actions">
+                            <a asp-action="CheckOut" asp-route-id="@b.Id" class="btn btn-sm @(due ? "btn-warning" : "btn-light")"><i class="bi bi-box-arrow-right me-1"></i>Check-out</a>
+                        </td>
+                    </tr>
+                }
+                @if (Model.InHouse.Count == 0)
+                {
+                    <tr><td colspan="7" class="empty-state"><i class="bi bi-house"></i>No guests are currently checked in.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

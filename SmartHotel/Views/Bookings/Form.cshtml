@@ -1,0 +1,137 @@
+@model BookingFormViewModel
+@inject Microsoft.Extensions.Options.IOptions<HotelSettings> Hotel
+@{
+    ViewData["Title"] = Model.IsEdit ? $"Edit Booking {Model.BookingNumber}" : "New Booking";
+    var taxRate = Hotel.Value.TaxRate.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    var createGuestReturn = Url.Action("Create", "Bookings");
+}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index">Bookings</a> / @(Model.IsEdit ? Model.BookingNumber : "New")</div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        @if (Model.IsCheckedIn)
+        {
+            <p class="page-subtitle">Guest is in-house: only the check-out date, party size and requests can be changed.</p>
+        }
+    </div>
+</div>
+
+<form asp-action="@(Model.IsEdit ? "Edit" : "Create")" asp-route-id="@Model.Id" method="post">
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="card-sh">
+                <div class="card-body">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between">
+                                <label asp-for="GuestId" class="form-label"></label>
+                                @if (!Model.IsCheckedIn)
+                                {
+                                    <a asp-controller="Guests" asp-action="Create" asp-route-returnUrl="@createGuestReturn" class="small"><i class="bi bi-person-plus"></i> New guest</a>
+                                }
+                            </div>
+                            @if (Model.IsCheckedIn)
+                            {
+                                <input type="hidden" asp-for="GuestId" />
+                                <input class="form-control" value="@Model.Guests.FirstOrDefault(g => g.Value == Model.GuestId.ToString())?.Text" disabled />
+                            }
+                            else
+                            {
+                                <select asp-for="GuestId" asp-items="Model.Guests" class="form-select">
+                                    <option value="">Select a guest…</option>
+                                </select>
+                            }
+                            <span asp-validation-for="GuestId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CheckInDate" class="form-label"></label>
+                            @if (Model.IsCheckedIn)
+                            {
+                                <input asp-for="CheckInDate" class="form-control" data-checkin readonly />
+                            }
+                            else if (Model.IsEdit)
+                            {
+                                <input asp-for="CheckInDate" class="form-control" data-checkin />
+                            }
+                            else
+                            {
+                                <input asp-for="CheckInDate" class="form-control" data-checkin min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                            }
+                            <span asp-validation-for="CheckInDate" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="CheckOutDate" class="form-label"></label>
+                            <input asp-for="CheckOutDate" class="form-control" data-checkout />
+                            <span asp-validation-for="CheckOutDate" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="RoomId" class="form-label"></label>
+                            @if (Model.IsCheckedIn)
+                            {
+                                var room = Model.Rooms.FirstOrDefault(r => r.Id == Model.RoomId);
+                                <input type="hidden" asp-for="RoomId" />
+                                <select class="form-select" disabled data-room-select data-exclude-booking="@Model.Id">
+                                    <option value="@Model.RoomId" data-price="@room?.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" selected>@room?.Label</option>
+                                </select>
+                            }
+                            else
+                            {
+                                <select asp-for="RoomId" class="form-select" data-room-select data-exclude-booking="@Model.Id">
+                                    <option value="">Select a room…</option>
+                                    @foreach (var r in Model.Rooms)
+                                    {
+                                        <option value="@r.Id" data-price="@r.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-capacity="@r.Capacity">@r.Label</option>
+                                    }
+                                </select>
+                                <div class="form-text" data-room-count>@Model.Rooms.Count room(s) available for these dates</div>
+                            }
+                            <span asp-validation-for="RoomId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label asp-for="Adults" class="form-label"></label>
+                            <input asp-for="Adults" type="number" min="1" max="10" class="form-control" />
+                            <span asp-validation-for="Adults" class="text-danger small"></span>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label asp-for="Children" class="form-label"></label>
+                            <input asp-for="Children" type="number" min="0" max="10" class="form-control" />
+                            <span asp-validation-for="Children" class="text-danger small"></span>
+                        </div>
+                        @if (!Model.IsCheckedIn)
+                        {
+                            <div class="col-md-6">
+                                <label asp-for="Status" class="form-label"></label>
+                                <select asp-for="Status" class="form-select">
+                                    <option value="@BookingStatus.Confirmed">Confirmed</option>
+                                    <option value="@BookingStatus.Pending">Pending (awaiting confirmation)</option>
+                                </select>
+                            </div>
+                        }
+                        <div class="col-12">
+                            <label asp-for="SpecialRequests" class="form-label"></label>
+                            <textarea asp-for="SpecialRequests" rows="2" class="form-control" placeholder="Late arrival, extra bed, airport pickup…"></textarea>
+                            <span asp-validation-for="SpecialRequests" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="card-sh" data-booking-summary data-tax-rate="@taxRate">
+                <div class="card-head"><h2>Booking Summary</h2></div>
+                <div class="card-body">
+                    <div class="summary-row"><span class="text-muted">Room</span><strong data-summary-room>—</strong></div>
+                    <div class="summary-row"><span class="text-muted">Nights</span><strong data-summary-nights>0</strong></div>
+                    <div class="summary-row"><span class="text-muted">Rate / night</span><strong data-summary-rate>—</strong></div>
+                    <div class="summary-row"><span class="text-muted">Subtotal</span><strong data-summary-subtotal>—</strong></div>
+                    <div class="summary-row"><span class="text-muted">Tax (@((Hotel.Value.TaxRate * 100).ToString("0.#"))%)</span><strong data-summary-tax>—</strong></div>
+                    <div class="summary-row total"><span>Estimated total</span><span data-summary-total>—</span></div>
+                    <button class="btn btn-primary w-100 mt-3"><i class="bi bi-check2 me-1"></i>@(Model.IsEdit ? "Save changes" : "Create booking")</button>
+                    <a asp-action="@(Model.IsEdit ? "Details" : "Index")" asp-route-id="@Model.Id" class="btn btn-light w-100 mt-2">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

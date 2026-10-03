@@ -1,0 +1,138 @@
+@model Booking
+@{
+    ViewData["Title"] = $"Booking {Model.BookingNumber}";
+    var today = DateTime.Today;
+    var canCheckIn = Model.Status is BookingStatus.Pending or BookingStatus.Confirmed && Model.CheckInDate <= today && Model.CheckOutDate > today;
+    var editable = Model.Status is BookingStatus.Pending or BookingStatus.Confirmed or BookingStatus.CheckedIn;
+    var cancellable = Model.Status is BookingStatus.Pending or BookingStatus.Confirmed;
+    var inv = Model.Invoice;
+}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index">Bookings</a> / @Model.BookingNumber</div>
+        <h1 class="page-title d-flex align-items-center gap-2">Booking @Model.BookingNumber @Ui.Badge(Model.Status)</h1>
+        <p class="page-subtitle">Created @Ui.Stamp(Model.CreatedAt)@(Model.CreatedBy is null ? "" : $" by {Model.CreatedBy}")</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        @if (Model.Status == BookingStatus.Pending)
+        {
+            <form asp-action="Confirm" asp-route-id="@Model.Id" method="post"><button class="btn btn-light"><i class="bi bi-check2-circle me-1"></i>Confirm</button></form>
+        }
+        @if (canCheckIn)
+        {
+            <form asp-controller="FrontDesk" asp-action="CheckIn" asp-route-id="@Model.Id" asp-route-returnUrl="@Url.Action("Details", new { id = Model.Id })" method="post">
+                <button class="btn btn-success"><i class="bi bi-box-arrow-in-right me-1"></i>Check-in</button>
+            </form>
+        }
+        @if (Model.Status == BookingStatus.CheckedIn)
+        {
+            <a asp-controller="FrontDesk" asp-action="CheckOut" asp-route-id="@Model.Id" class="btn btn-warning"><i class="bi bi-box-arrow-right me-1"></i>Check-out</a>
+        }
+        @if (editable)
+        {
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-light"><i class="bi bi-pencil-square me-1"></i>Edit</a>
+        }
+        @if (cancellable)
+        {
+            <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+        }
+        @if (User.IsManagement())
+        {
+            <form asp-action="Delete" asp-route-id="@Model.Id" method="post" data-confirm="Permanently delete booking @Model.BookingNumber? Its invoice and payments are deleted too. This cannot be undone." data-confirm-title="Delete booking">
+                <button class="btn btn-outline-danger"><i class="bi bi-trash3"></i></button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card-sh mb-3">
+            <div class="card-head"><h2>Stay</h2></div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <dl class="dl-sh">
+                            <dt>Check-in</dt><dd>@Model.CheckInDate.ToString("ddd, dd MMM yyyy")</dd>
+                            <dt>Check-out</dt><dd>@Model.CheckOutDate.ToString("ddd, dd MMM yyyy")</dd>
+                            <dt>Nights</dt><dd>@Model.Nights</dd>
+                            <dt>Guests</dt><dd>@Model.Adults adult(s)@(Model.Children > 0 ? $", {Model.Children} child(ren)" : "")</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="dl-sh">
+                            <dt>Room</dt><dd>@Model.Room?.RoomNumber · @Model.Room?.RoomType?.Name</dd>
+                            <dt>Rate</dt><dd>@Ui.Money(Model.PricePerNight) / night</dd>
+                            <dt>Arrived</dt><dd>@Ui.Stamp(Model.ActualCheckIn)</dd>
+                            <dt>Departed</dt><dd>@Ui.Stamp(Model.ActualCheckOut)</dd>
+                        </dl>
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(Model.SpecialRequests))
+                {
+                    <div class="alert alert-light border mt-3 mb-0"><i class="bi bi-chat-left-text me-2"></i>@Model.SpecialRequests</div>
+                }
+                @if (Model.Status == BookingStatus.Cancelled)
+                {
+                    <div class="alert alert-danger mt-3 mb-0">Cancelled on @Ui.Stamp(Model.CancelledAt)@(Model.CancellationReason is null ? "" : $": {Model.CancellationReason}")</div>
+                }
+            </div>
+        </div>
+
+        <div class="card-sh">
+            <div class="card-head"><h2>Guest</h2><a asp-controller="Guests" asp-action="Details" asp-route-id="@Model.GuestId" class="small fw-normal">View profile</a></div>
+            <div class="card-body d-flex align-items-center gap-3">
+                <span class="avatar avatar-lg">@Ui.Initials(Model.Guest?.FullName)</span>
+                <div>
+                    <div class="fw-bold fs-5">@Model.Guest?.FullName</div>
+                    <div class="text-muted small"><i class="bi bi-telephone me-1"></i>@Model.Guest?.Phone <span class="mx-2">·</span><i class="bi bi-envelope me-1"></i>@(Model.Guest?.Email ?? "—")</div>
+                    <div class="text-muted small"><i class="bi bi-person-vcard me-1"></i>@Model.Guest?.IdType @Model.Guest?.IdNumber</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="card-sh">
+            <div class="card-head"><h2>Billing</h2>@if (inv is not null) { @Ui.Badge(inv.Status) }</div>
+            <div class="card-body">
+                @if (inv is null)
+                {
+                    <div class="summary-row"><span class="text-muted">Room charges</span><strong>@Ui.Money(Model.TotalAmount)</strong></div>
+                    <p class="text-muted small mt-2">No invoice yet. An invoice is created automatically at check-in, or you can create one now to take a deposit.</p>
+                    @if (Model.Status != BookingStatus.Cancelled)
+                    {
+                        <a asp-controller="Payments" asp-action="Create" asp-route-bookingId="@Model.Id" class="btn btn-primary w-100"><i class="bi bi-receipt me-1"></i>Create invoice</a>
+                    }
+                }
+                else
+                {
+                    <div class="summary-row"><span class="text-muted">Invoice</span><a asp-controller="Payments" asp-action="Details" asp-route-id="@inv.Id" class="fw-semibold">@inv.InvoiceNumber</a></div>
+                    <div class="summary-row"><span class="text-muted">Total</span><strong>@Ui.Money(inv.Total)</strong></div>
+                    <div class="summary-row"><span class="text-muted">Paid</span><strong class="text-success">@Ui.Money(inv.AmountPaid)</strong></div>
+                    <div class="summary-row total"><span>Balance</span><span class="@(inv.Balance > 0 ? "text-danger" : "")">@Ui.Money(inv.Balance)</span></div>
+                    <a asp-controller="Payments" asp-action="Details" asp-route-id="@inv.Id" class="btn btn-primary w-100 mt-3"><i class="bi bi-cash-coin me-1"></i>Open invoice</a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (cancellable)
+{
+    <div class="modal fade" id="cancelModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" class="modal-content border-0 shadow">
+                <div class="modal-header border-0"><h5 class="modal-title fw-bold">Cancel booking @Model.BookingNumber</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body pt-0">
+                    <label class="form-label" for="reason">Reason (optional)</label>
+                    <input id="reason" name="reason" maxlength="250" class="form-control" placeholder="e.g. Guest changed travel plans" />
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Keep booking</button>
+                    <button class="btn btn-danger">Cancel booking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

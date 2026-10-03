@@ -1,0 +1,60 @@
+@model GuestListViewModel
+@{
+    ViewData["Title"] = "Guest Management";
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Guest Management</h1>
+        <p class="page-subtitle">Guest profiles, identification and booking history.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Add Guest</a>
+</div>
+
+<div class="card-sh">
+    <form method="get" class="card-filter row g-2">
+        <div class="col-md-6 col-lg-5">
+            <div class="input-icon"><i class="bi bi-search"></i>
+                <input name="search" value="@Model.Search" class="form-control" placeholder="Search guests by name, phone, email or ID..." />
+            </div>
+        </div>
+        <div class="col-auto"><button class="btn btn-light">Search</button></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table table-sh">
+            <thead><tr><th>ID</th><th>Full Name</th><th>Phone</th><th>Email</th><th>ID Number</th><th>Nationality</th><th class="text-end">Actions</th></tr></thead>
+            <tbody>
+            @foreach (var g in Model.Guests.Items)
+            {
+                <tr>
+                    <td class="text-muted">@g.Code</td>
+                    <td>
+                        <a asp-action="Details" asp-route-id="@g.Id" class="d-flex align-items-center gap-2 text-reset">
+                            <span class="avatar avatar-sm">@Ui.Initials(g.FullName)</span><span class="fw-semibold">@g.FullName</span>
+                        </a>
+                    </td>
+                    <td>@g.Phone</td>
+                    <td>@g.Email</td>
+                    <td><span class="small text-muted">@g.IdType</span><br />@g.IdNumber</td>
+                    <td>@g.Nationality</td>
+                    <td class="actions">
+                        <a asp-controller="Bookings" asp-action="Create" asp-route-guestId="@g.Id" class="btn-icon success" title="New booking"><i class="bi bi-calendar-plus"></i></a>
+                        <a asp-action="Details" asp-route-id="@g.Id" class="btn-icon view" title="View"><i class="bi bi-eye"></i></a>
+                        <a asp-action="Edit" asp-route-id="@g.Id" class="btn-icon edit" title="Edit"><i class="bi bi-pencil-square"></i></a>
+                        @if (User.IsManagement())
+                        {
+                            <form asp-action="Delete" asp-route-id="@g.Id" method="post" data-confirm="Delete guest @g.FullName? All their bookings, invoices and payments are deleted too. This cannot be undone." data-confirm-title="Delete guest">
+                                <button class="btn-icon delete" title="Delete"><i class="bi bi-trash3"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Guests.TotalCount == 0)
+            {
+                <tr><td colspan="7" class="empty-state"><i class="bi bi-people"></i>No guests found.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="Model.Guests" />
+</div>

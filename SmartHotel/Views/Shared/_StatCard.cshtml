@@ -1,0 +1,26 @@
+@model StatCardModel
+@{
+    void Body()
+    {
+        <div class="stat-icon bg-soft-@Model.Tone"><i class="bi @Model.Icon"></i></div>
+        <div class="min-w-0">
+            <div class="stat-label">@Model.Label</div>
+            <div class="stat-value">@Model.Value</div>
+            @if (!string.IsNullOrEmpty(Model.Hint))
+            {
+                <div class="stat-hint">@Model.Hint</div>
+            }
+        </div>
+    }
+}
+@if (Model.Url is null)
+{
+    <div class="card-sh stat-card h-100">@{ Body(); }</div>
+}
+else
+{
+    <a href="@Model.Url" class="card-sh stat-card stat-card-link h-100">
+        @{ Body(); }
+        <i class="bi bi-chevron-right stat-go" aria-hidden="true"></i>
+    </a>
+}

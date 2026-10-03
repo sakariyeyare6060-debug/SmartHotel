@@ -1,0 +1,20 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = Model.StatusCode.ToString();
+    Layout = "_AuthLayout";
+    var (title, text) = Model.StatusCode switch
+    {
+        404 => ("Page not found", "The page or record you are looking for does not exist or was removed."),
+        403 => ("Access denied", "You do not have permission to view this page."),
+        429 => ("Too many requests", "Please wait a moment and try again."),
+        _ => ("Request failed", "The server could not process your request.")
+    };
+}
+<div class="error-page">
+    <div class="error-card">
+        <div class="error-code">@Model.StatusCode</div>
+        <h1 class="h4 fw-bold">@title</h1>
+        <p class="text-muted">@text</p>
+        <a class="btn btn-primary" href="~/">Back to dashboard</a>
+    </div>
+</div>

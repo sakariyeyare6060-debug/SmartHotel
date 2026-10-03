@@ -1,0 +1,41 @@
+@model ReceiptViewModel
+@{
+    var p = Model.Payment;
+    var inv = p.Invoice!;
+    var b = inv.Booking!;
+    ViewData["Title"] = $"Receipt {p.ReceiptNumber}";
+}
+<div class="page-header no-print">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Details" asp-route-id="@inv.Id">Invoice @inv.InvoiceNumber</a> / Receipt</div>
+        <h1 class="page-title">Receipt @p.ReceiptNumber</h1>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print receipt</button>
+</div>
+<div class="card-sh doc" style="max-width:520px">
+    <div class="card-body p-4">
+        <div class="text-center mb-4">
+            <div class="fs-3 text-primary"><i class="bi bi-buildings"></i></div>
+            <div class="fw-bold fs-5">@Model.Hotel.Name</div>
+            <div class="small text-muted">@Model.Hotel.Address · @Model.Hotel.Phone</div>
+        </div>
+        <div class="text-center mb-4">
+            <div class="text-muted small">PAYMENT RECEIPT</div>
+            <div class="display-6 fw-bold">@Ui.Money(p.Amount)</div>
+            <div class="pill pill-success mt-1">Received</div>
+        </div>
+        <div class="summary-row"><span class="text-muted">Receipt no.</span><strong>@p.ReceiptNumber</strong></div>
+        <div class="summary-row"><span class="text-muted">Date</span><strong>@Ui.Stamp(p.PaidAt)</strong></div>
+        <div class="summary-row"><span class="text-muted">Guest</span><strong>@b.Guest?.FullName</strong></div>
+        <div class="summary-row"><span class="text-muted">Room</span><strong>@b.Room?.RoomNumber</strong></div>
+        <div class="summary-row"><span class="text-muted">Invoice</span><strong>@inv.InvoiceNumber</strong></div>
+        <div class="summary-row"><span class="text-muted">Method</span><strong>@p.Method.DisplayName()</strong></div>
+        @if (!string.IsNullOrEmpty(p.Reference))
+        {
+            <div class="summary-row"><span class="text-muted">Reference</span><strong>@p.Reference</strong></div>
+        }
+        <div class="summary-row"><span class="text-muted">Received by</span><strong>@p.ReceivedBy</strong></div>
+        <div class="summary-row total"><span>Invoice balance</span><span>@Ui.Money(inv.Balance)</span></div>
+        <p class="text-center small text-muted mt-4 mb-0">Thank you for staying with us!</p>
+    </div>
+</div>

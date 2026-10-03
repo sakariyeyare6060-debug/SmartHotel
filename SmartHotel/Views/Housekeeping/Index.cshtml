@@ -1,0 +1,144 @@
+@model HousekeepingViewModel
+@{
+    ViewData["Title"] = "Housekeeping";
+    var tiles = new (RoomStatus Status, string Tone, string Bg)[]
+    {
+        (RoomStatus.Available, "info", "#e1edff"),
+        (RoomStatus.Occupied, "success", "#dcf5e3"),
+        (RoomStatus.Dirty, "warning", "#fff0d6"),
+        (RoomStatus.Clean, "teal", "#d8f5f3"),
+        (RoomStatus.Maintenance, "danger", "#fde2e2")
+    };
+    // Suggested next status when a tile is clicked.
+    RoomStatus Next(RoomStatus s) => s switch
+    {
+        RoomStatus.Dirty => RoomStatus.Clean,
+        RoomStatus.Clean => RoomStatus.Available,
+        RoomStatus.Maintenance => RoomStatus.Available,
+        _ => RoomStatus.Dirty
+    };
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Housekeeping</h1>
+        <p class="page-subtitle">Click a room to update its status. Check-in and check-out update rooms automatically.</p>
+    </div>
+    <form method="get" class="d-flex gap-2">
+        @if (Model.Status.HasValue) { <input type="hidden" name="status" value="@Model.Status" /> }
+        <select name="floor" class="form-select" style="min-width:150px" onchange="this.form.submit()" aria-label="Floor">
+            <option value="">All floors</option>
+            @foreach (var f in Model.Floors)
+            {
+                <option value="@f" selected="@(Model.Floor == f)">Floor @f</option>
+            }
+        </select>
+    </form>
+</div>
+
+<h2 class="h6 fw-semibold mb-2">Room Status</h2>
+<div class="row g-3 mb-4 row-cols-2 row-cols-md-3 row-cols-xl-5">
+    @foreach (var t in tiles)
+    {
+        var selected = Model.Status == t.Status;
+        <div class="col">
+            <a class="hk-tile pill-@t.Tone @(selected ? "selected" : "")" style="background:@t.Bg"
+               asp-action="Index" asp-route-status="@(selected ? null : t.Status.ToString())" asp-route-floor="@Model.Floor">
+                <span class="hk-icon"><i class="bi @Ui.Icon(t.Status)"></i></span>
+                <span>
+                    <span class="d-block small fw-semibold">@t.Status.DisplayName()</span>
+                    <span class="hk-count">@Model.Counts.GetValueOrDefault(t.Status)</span>
+                </span>
+            </a>
+        </div>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="card-sh">
+            <div class="card-head">
+                <h2>Rooms @(Model.Status.HasValue ? $"· {Model.Status.Value.DisplayName()}" : "")</h2>
+                @if (Model.Status.HasValue || Model.Floor.HasValue)
+                {
+                    <a asp-action="Index" class="small fw-normal">Clear filters</a>
+                }
+            </div>
+            <div class="card-body">
+                <div class="room-grid">
+                    @foreach (var r in Model.Rooms)
+                    {
+                        <button type="button" class="room-tile tone-@Ui.Tone(r.Status)" data-bs-toggle="modal" data-bs-target="#statusModal"
+                                data-room-id="@r.Id" data-room-number="@r.RoomNumber" data-status="@r.Status"
+                                data-status-label="@r.Status.DisplayName()" data-next="@Next(r.Status)">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <span class="room-no">@r.RoomNumber</span>
+                                <i class="bi @Ui.Icon(r.Status) text-muted"></i>
+                            </div>
+                            <div class="room-type mb-2">@r.RoomType?.Name · Floor @r.Floor</div>
+                            @Ui.Badge(r.Status)
+                        </button>
+                    }
+                </div>
+                @if (Model.Rooms.Count == 0)
+                {
+                    <div class="empty-state"><i class="bi bi-door-closed"></i>No rooms in this status.</div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card-sh">
+            <div class="card-head"><h2>Recent Updates</h2></div>
+            <div class="card-body py-2">
+                @foreach (var log in Model.RecentLogs)
+                {
+                    <div class="timeline-item">
+                        <span class="notif-icon sm bg-soft-@(log.ToStatus switch { RoomStatus.Dirty => "orange", RoomStatus.Maintenance => "red", RoomStatus.Occupied => "green", RoomStatus.Clean => "teal", _ => "primary" })">
+                            <i class="bi @Ui.Icon(log.ToStatus)"></i>
+                        </span>
+                        <div class="flex-fill small">
+                            <div><strong>Room @log.Room?.RoomNumber</strong> marked as <strong>@log.ToStatus.DisplayName()</strong></div>
+                            @if (!string.IsNullOrEmpty(log.Note)) { <div class="text-muted">@log.Note</div> }
+                            <div class="text-muted">@log.ChangedBy · @Ui.TimeAgo(log.CreatedAt)</div>
+                        </div>
+                    </div>
+                }
+                @if (Model.RecentLogs.Count == 0)
+                {
+                    <div class="empty-state">No updates yet.</div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form asp-action="UpdateStatus" method="post" class="modal-content border-0 shadow">
+            <input type="hidden" name="RoomId" />
+            <input type="hidden" name="filterStatus" value="@Model.Status" />
+            <input type="hidden" name="filterFloor" value="@Model.Floor" />
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Room <span data-room-label></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <p class="text-muted small">Current status: <strong data-room-current></strong></p>
+                <div class="alert alert-warning small" data-occupied-warning hidden>This room is occupied. Its status changes automatically when the guest checks out.</div>
+                <label class="form-label" for="hkStatus">New status</label>
+                <select id="hkStatus" name="Status" class="form-select mb-3">
+                    @foreach (var s in Enum.GetValues<RoomStatus>().Where(s => s != RoomStatus.Occupied))
+                    {
+                        <option value="@s">@s.DisplayName()</option>
+                    }
+                </select>
+                <label class="form-label" for="hkNote">Note (optional)</label>
+                <input id="hkNote" name="Note" maxlength="250" class="form-control" placeholder="e.g. Broken AC, linen changed, inspected" />
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary">Update status</button>
+            </div>
+        </form>
+    </div>
+</div>

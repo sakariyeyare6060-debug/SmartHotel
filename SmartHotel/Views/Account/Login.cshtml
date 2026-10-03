@@ -1,0 +1,68 @@
+@model LoginViewModel
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@{
+    ViewData["Title"] = "Sign in";
+    Layout = "_AuthLayout";
+}
+<div class="auth-wrap">
+    <section class="auth-hero">
+        <div>
+            <h1>Smart Hotel<br />Management System</h1>
+            <p class="mb-0">Comfort · Service · Excellence</p>
+        </div>
+    </section>
+
+    <section class="auth-panel">
+        <div class="auth-card">
+            <div class="text-center mb-4">
+                <div class="auth-logo mb-2"><i class="bi bi-buildings"></i></div>
+                <h2 class="h5 fw-bold mb-0">Smart Hotel<br />Management System</h2>
+            </div>
+            <h3 class="h6 fw-semibold mb-3">Sign in to your account</h3>
+
+            <form asp-action="Login" method="post" novalidate>
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+
+                <div class="mb-3">
+                    <div class="input-icon">
+                        <i class="bi bi-person"></i>
+                        <input asp-for="Username" class="form-control" placeholder="Username or Email" autocomplete="username" autofocus />
+                    </div>
+                    <span asp-validation-for="Username" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <div class="input-icon">
+                        <i class="bi bi-lock"></i>
+                        <input asp-for="Password" class="form-control" placeholder="Password" autocomplete="current-password" />
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="form-check">
+                        <input asp-for="RememberMe" class="form-check-input" />
+                        <label asp-for="RememberMe" class="form-check-label small"></label>
+                    </div>
+                    <a href="#" class="small" data-bs-toggle="tooltip" title="Ask an administrator to reset your password from Staff Management.">Forgot password?</a>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2">Login</button>
+            </form>
+
+            @if (Env.IsDevelopment())
+            {
+                <div class="demo-accounts mt-4">
+                    <div class="fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>Demo accounts</div>
+                    <div><code>admin</code> / Admin@123 · <code>manager</code> / Manager@123</div>
+                    <div><code>reception</code> / Reception@123 · <code>housekeeping</code> / House@123</div>
+                </div>
+            }
+
+            <p class="text-center text-muted small mt-4 mb-0">© @DateTime.Today.Year Smart Hotel Management System</p>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));</script>
+}

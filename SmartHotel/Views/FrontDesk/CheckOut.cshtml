@@ -1,0 +1,76 @@
+@model CheckOutViewModel
+@{
+    var b = Model.Booking;
+    var inv = Model.Invoice;
+    ViewData["Title"] = $"Check-out · Room {b.Room?.RoomNumber}";
+    var early = b.CheckOutDate.Date > DateTime.Today;
+}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index" asp-route-tab="checkout">Check-out</a> / @b.BookingNumber</div>
+        <h1 class="page-title">Check-out: @b.Guest?.FullName</h1>
+        <p class="page-subtitle">Room @b.Room?.RoomNumber · @b.Room?.RoomType?.Name · @b.Nights night(s)</p>
+    </div>
+</div>
+
+@if (early)
+{
+    <div class="alert alert-warning"><i class="bi bi-info-circle me-2"></i>Early departure — the booking was scheduled until @Ui.Date(b.CheckOutDate). Charges remain as booked; adjust the invoice if a refund or discount applies.</div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card-sh">
+            <div class="card-head"><h2>Bill summary @(inv.Id > 0 ? $"· {inv.InvoiceNumber}" : "")</h2>@Ui.Badge(inv.Status)</div>
+            <div class="card-body">
+                <div class="summary-row"><span>Room: @b.Nights × @Ui.Money(b.PricePerNight)</span><span>@Ui.Money(inv.Subtotal)</span></div>
+                <div class="summary-row"><span>Extra charges</span><span>@Ui.Money(inv.ExtraCharges)</span></div>
+                <div class="summary-row"><span>Discount</span><span>-@Ui.Money(inv.Discount)</span></div>
+                <div class="summary-row"><span>Tax (@((inv.TaxRate * 100).ToString("0.#"))%)</span><span>@Ui.Money(inv.TaxAmount)</span></div>
+                <div class="summary-row total"><span>Total</span><span>@Ui.Money(inv.Total)</span></div>
+                <div class="summary-row text-success"><span>Paid</span><span>@Ui.Money(inv.AmountPaid)</span></div>
+                <div class="summary-row total"><span>Balance due</span><span class="@(inv.Balance > 0 ? "text-danger" : "text-success")">@Ui.Money(inv.Balance)</span></div>
+                @if (inv.Id > 0)
+                {
+                    <a asp-controller="Payments" asp-action="Details" asp-route-id="@inv.Id" class="small"><i class="bi bi-pencil me-1"></i>Add extra charges or a discount on the invoice</a>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card-sh">
+            <div class="card-head"><h2>Settle &amp; check out</h2></div>
+            <div class="card-body">
+                <form asp-action="CheckOut" method="post" data-confirm="Complete check-out for @b.Guest?.FullName (Room @b.Room?.RoomNumber)? The room will be marked Dirty for housekeeping." data-confirm-title="Complete check-out" data-confirm-button="Check out" data-confirm-class="btn-primary">
+                    <input type="hidden" asp-for="Form.BookingId" />
+                    @if (inv.Balance > 0)
+                    {
+                        <div class="mb-3">
+                            <label asp-for="Form.PaymentAmount" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text">@Ui.Currency</span>
+                                <input asp-for="Form.PaymentAmount" type="number" step="0.01" min="0" class="form-control" />
+                            </div>
+                            <div class="form-text">The full balance must be settled to complete check-out.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label asp-for="Form.Method" class="form-label"></label>
+                            <select asp-for="Form.Method" asp-items="Html.GetEnumSelectList<PaymentMethod>()" class="form-select"></select>
+                        </div>
+                        <div class="mb-4">
+                            <label asp-for="Form.Reference" class="form-label">Reference (card / transaction no.)</label>
+                            <input asp-for="Form.Reference" class="form-control" />
+                        </div>
+                    }
+                    else
+                    {
+                        <input type="hidden" asp-for="Form.PaymentAmount" value="0" />
+                        <div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>The invoice is fully paid.</div>
+                    }
+                    <button class="btn btn-primary w-100 py-2"><i class="bi bi-box-arrow-right me-1"></i>Complete Check-out</button>
+                    <a asp-action="Index" asp-route-tab="checkout" class="btn btn-light w-100 mt-2">Back</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

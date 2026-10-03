@@ -1,0 +1,178 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var statusColors = new Dictionary<RoomStatus, string>
+    {
+        [RoomStatus.Occupied] = "#1f9d55",
+        [RoomStatus.Available] = "#1d6ff2",
+        [RoomStatus.Clean] = "#0ea5a4",
+        [RoomStatus.Dirty] = "#f28c28",
+        [RoomStatus.Maintenance] = "#e5484d"
+    };
+    var isManagement = User.IsManagement();
+    var revenueUrl = isManagement
+        ? Url.Action("Index", "Reports", new { mode = ReportMode.Monthly, month = DateTime.Today.ToString("yyyy-MM") })
+        : Url.Action("Index", "Payments");
+    var revenueReportBase = Url.Action("Index", "Reports", new { mode = ReportMode.Monthly });
+}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Welcome back, @User.GetDisplayName(). Here's what is happening at the hotel today.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-controller="FrontDesk" asp-action="Index" class="pill pill-info"><i class="bi bi-box-arrow-in-right me-1"></i>@Model.ArrivalsToday arrivals today</a>
+        <a asp-controller="FrontDesk" asp-action="Index" asp-route-tab="checkout" class="pill pill-warning"><i class="bi bi-box-arrow-right me-1"></i>@Model.DeparturesToday departures due</a>
+        <a asp-controller="Bookings" asp-action="Index" asp-route-status="Pending" class="pill pill-secondary"><i class="bi bi-hourglass-split me-1"></i>@Model.PendingBookings pending</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-3 row-cols-1 row-cols-sm-2 row-cols-xl-5">
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Total Rooms", Model.TotalRooms.ToString(), "bi-door-closed", "primary", Url: Url.Action("Index", "Rooms")))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Occupied Rooms", Model.OccupiedRooms.ToString(), "bi-door-open", "purple", $"{Model.InHouseGuests} guests in-house", Url.Action("Index", "Rooms", new { status = RoomStatus.Occupied })))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Available Rooms", Model.AvailableRooms.ToString(), "bi-check2-square", "green", Url: Url.Action("Index", "Rooms", new { ready = true })))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Total Guests", Model.TotalGuests.ToString(), "bi-people", "sky", Url: Url.Action("Index", "Guests")))</div>
+    <div class="col">@await Html.PartialAsync("_StatCard", new StatCardModel("Monthly Revenue", Ui.Money(Model.MonthRevenue, true), "bi-currency-dollar", "orange", $"{Ui.Money(Model.OutstandingBalance, true)} outstanding", revenueUrl))</div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-6 col-xl-3">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Occupancy Rate</h2><a asp-controller="Rooms" asp-action="Index" asp-route-status="@RoomStatus.Occupied" class="small fw-normal">Details</a></div>
+            <div class="card-body text-center">
+                <div class="occupancy-ring" style="--p:@Model.OccupancyRate"><span>@Model.OccupancyRate%</span></div>
+                <div class="text-muted">@Model.OccupiedRooms / @Model.TotalRooms Rooms</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3 order-xl-last">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Room Status</h2><a asp-controller="Housekeeping" asp-action="Index" class="small fw-normal">Details</a></div>
+            <div class="card-body">
+                <div style="height:160px"><canvas id="statusChart" aria-label="Room status chart"></canvas></div>
+                <ul class="list-unstyled small mt-3 mb-0">
+                    @foreach (var s in statusColors)
+                    {
+                        <li>
+                            <a asp-controller="Housekeeping" asp-action="Index" asp-route-status="@s.Key" class="status-row d-flex justify-content-between py-1">
+                                <span><span class="legend-dot" style="background:@s.Value"></span>@s.Key.DisplayName()</span>
+                                <strong>@Model.RoomStatusCounts.GetValueOrDefault(s.Key)</strong>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Revenue Overview</h2><span class="small fw-normal"><span class="text-muted">Last 12 months</span> · <a href="@revenueUrl">Details</a></span></div>
+            <div class="card-body"><div class="chart-box"><canvas id="revenueChart" aria-label="Revenue chart"></canvas></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-9">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Recent Bookings</h2><a asp-controller="Bookings" asp-action="Index" class="small fw-normal">View all</a></div>
+            <div class="table-responsive">
+                <table class="table table-sh">
+                    <thead><tr><th>ID</th><th>Guest Name</th><th>Room</th><th>Check-in</th><th>Check-out</th><th>Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @foreach (var b in Model.RecentBookings)
+                    {
+                        <tr>
+                            <td><a asp-controller="Bookings" asp-action="Details" asp-route-id="@b.Id" class="fw-semibold">@b.BookingNumber</a></td>
+                            <td>@b.Guest?.FullName</td>
+                            <td>@b.Room?.RoomNumber</td>
+                            <td>@Ui.Date(b.CheckInDate)</td>
+                            <td>@Ui.Date(b.CheckOutDate)</td>
+                            <td>@Ui.Money(b.TotalAmount)</td>
+                            <td>@Ui.Badge(b.Status)</td>
+                        </tr>
+                    }
+                    @if (Model.RecentBookings.Count == 0)
+                    {
+                        <tr><td colspan="7" class="empty-state"><i class="bi bi-calendar-x"></i>No bookings yet.</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="card-sh h-100">
+            <div class="card-head"><h2>Quick Actions</h2></div>
+            <div class="card-body">
+                <a asp-controller="Bookings" asp-action="Create" class="quick-action qa-blue"><i class="bi bi-calendar-plus"></i>Add New Booking</a>
+                <a asp-controller="FrontDesk" asp-action="Index" class="quick-action qa-green"><i class="bi bi-box-arrow-in-right"></i>Check-in Guest</a>
+                <a asp-controller="Guests" asp-action="Create" class="quick-action qa-purple"><i class="bi bi-person-plus"></i>Add Guest</a>
+                @if (isManagement)
+                {
+                    <a asp-controller="Rooms" asp-action="Create" class="quick-action qa-green"><i class="bi bi-door-open"></i>Add Room</a>
+                    <a asp-controller="Reports" asp-action="Index" class="quick-action qa-orange"><i class="bi bi-file-earmark-bar-graph"></i>Generate Report</a>
+                }
+                else
+                {
+                    <a asp-controller="Payments" asp-action="Index" class="quick-action qa-orange"><i class="bi bi-receipt"></i>Invoices &amp; Payments</a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script>
+        const revenueMonths = @Json.Serialize(Model.RevenueMonths);
+        const revenueReportBase = @Json.Serialize(isManagement ? revenueReportBase : null);
+        const statusUrl = @Json.Serialize(Url.Action("Index", "Housekeeping"));
+        const statusKeys = @Json.Serialize(statusColors.Keys.Select(k => k.ToString()));
+
+        // Draw after the web font loads so axis labels are measured correctly.
+        document.fonts.ready.then(function () {
+            Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+            Chart.defaults.color = '#6b7a90';
+
+            new Chart(document.getElementById('revenueChart'), {
+                type: 'bar',
+                data: {
+                    labels: @Json.Serialize(Model.RevenueLabels),
+                    datasets: [{ label: 'Revenue', data: @Json.Serialize(Model.RevenueValues), backgroundColor: '#1d6ff2', borderRadius: 6, maxBarThickness: 26 }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    layout: { padding: { left: 6 } },
+                    onClick: (e, els) => {
+                        if (!revenueReportBase || !els.length) return;
+                        location.href = revenueReportBase + '&month=' + revenueMonths[els[0].index];
+                    },
+                    onHover: (e, els) => { e.native.target.style.cursor = revenueReportBase && els.length ? 'pointer' : 'default'; },
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => smartHotel.money(c.parsed.y) } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#eef1f6' }, ticks: { callback: v => '$' + Number(v).toLocaleString() } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('statusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: @Json.Serialize(statusColors.Keys.Select(k => k.DisplayName())),
+                    datasets: [{
+                        data: @Json.Serialize(statusColors.Keys.Select(k => Model.RoomStatusCounts.GetValueOrDefault(k))),
+                        backgroundColor: @Json.Serialize(statusColors.Values),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false } },
+                    onClick: (e, els) => { if (els.length) location.href = statusUrl + '?status=' + statusKeys[els[0].index]; },
+                    onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+                }
+            });
+        });
+    </script>
+}

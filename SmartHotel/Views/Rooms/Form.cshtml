@@ -1,0 +1,80 @@
+@model RoomFormViewModel
+@{
+    ViewData["Title"] = Model.IsEdit ? $"Edit Room {Model.RoomNumber}" : "Add Room";
+}
+<div class="page-header">
+    <div>
+        <div class="breadcrumb-sh"><a asp-action="Index">Rooms</a> / @(Model.IsEdit ? "Edit" : "New")</div>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 col-xl-6">
+        <div class="card-sh">
+            <div class="card-body">
+                <form asp-action="@(Model.IsEdit ? "Edit" : "Create")" asp-route-id="@Model.Id" method="post">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label asp-for="RoomNumber" class="form-label"></label>
+                            <input asp-for="RoomNumber" class="form-control" placeholder="e.g. 101" />
+                            <span asp-validation-for="RoomNumber" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-6">
+                            <label asp-for="Floor" class="form-label"></label>
+                            <input asp-for="Floor" class="form-control" type="number" min="0" />
+                            <span asp-validation-for="Floor" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-6">
+                            <label asp-for="RoomTypeId" class="form-label"></label>
+                            <select asp-for="RoomTypeId" class="form-select" data-type-select="#PricePerNight">
+                                <option value="">Select type…</option>
+                                @foreach (var t in Model.RoomTypes)
+                                {
+                                    <option value="@t.Id" data-price="@t.BasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture)">@t.Name (max @t.Capacity)</option>
+                                }
+                            </select>
+                            <span asp-validation-for="RoomTypeId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-6">
+                            <label asp-for="PricePerNight" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text">@Ui.Currency</span>
+                                <input asp-for="PricePerNight" class="form-control" type="number" step="0.01" min="1" />
+                            </div>
+                            <span asp-validation-for="PricePerNight" class="text-danger small"></span>
+                        </div>
+                        @if (!Model.IsEdit)
+                        {
+                            <div class="col-sm-6">
+                                <label asp-for="Status" class="form-label"></label>
+                                <select asp-for="Status" class="form-select">
+                                    <option value="@RoomStatus.Available">Available</option>
+                                    <option value="@RoomStatus.Maintenance">Maintenance</option>
+                                </select>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-sm-6">
+                                <label class="form-label">Current status</label>
+                                <div class="pt-2">@Ui.Badge(Model.Status) <a asp-controller="Housekeeping" asp-action="Index" class="small ms-2">Change in Housekeeping</a></div>
+                            </div>
+                        }
+                        <div class="col-12">
+                            <label asp-for="Description" class="form-label"></label>
+                            <textarea asp-for="Description" class="form-control" rows="3" placeholder="View, bed type, special features…"></textarea>
+                            <span asp-validation-for="Description" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button class="btn btn-primary"><i class="bi bi-check2 me-1"></i>@(Model.IsEdit ? "Save changes" : "Add room")</button>
+                        <a asp-action="Index" class="btn btn-light">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,16 +11,35 @@ using SmartHotel.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ---------- Hosting (Railway / containers) ----------
+// Railway injects PORT and terminates HTTPS at its proxy.
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port)) builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // ---------- Configuration ----------
 builder.Services.Configure<HotelSettings>(builder.Configuration.GetSection("Hotel"));
 
 // ---------- Database ----------
 var useInMemory = builder.Configuration.GetValue<bool>("Database:UseInMemory");
+var postgresUrl = builder.Configuration["DATABASE_URL"];
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (useInMemory)
     {
         options.UseInMemoryDatabase("SmartHotelDemo");
+    }
+    else if (!string.IsNullOrEmpty(postgresUrl))
+    {
+        // The app stores local DateTime values; keep Npgsql's pre-6.0 timestamp mapping.
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+        options.UseNpgsql(ToNpgsqlConnectionString(postgresUrl), pg => pg.EnableRetryOnFailure(3));
     }
     else
     {
@@ -100,6 +120,8 @@ Ui.Currency = app.Services.GetRequiredService<IOptions<HotelSettings>>().Value.C
 await InitializeDatabaseAsync(app);
 
 // ---------- HTTP pipeline ----------
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -138,6 +160,23 @@ app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Inde
 
 app.Run();
 
+// Converts postgresql://user:pass@host:port/db (Railway's DATABASE_URL) into an Npgsql connection string.
+static string ToNpgsqlConnectionString(string url)
+{
+    if (!url.StartsWith("postgres", StringComparison.OrdinalIgnoreCase)) return url;
+
+    var uri = new Uri(url);
+    var userInfo = uri.UserInfo.Split(':', 2);
+    return new Npgsql.NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port > 0 ? uri.Port : 5432,
+        Database = uri.AbsolutePath.TrimStart('/'),
+        Username = Uri.UnescapeDataString(userInfo[0]),
+        Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : null
+    }.ConnectionString;
+}
+
 static async Task InitializeDatabaseAsync(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
@@ -148,7 +187,12 @@ static async Task InitializeDatabaseAsync(WebApplication app)
 
     try
     {
-        if (db.Database.IsRelational())
+        if (db.Database.IsNpgsql())
+        {
+            // The checked-in migrations are SQL Server-specific, so build the PostgreSQL schema from the model.
+            await db.Database.EnsureCreatedAsync();
+        }
+        else if (db.Database.IsRelational())
         {
             if (config.GetValue("Database:MigrateOnStartup", true))
             {
